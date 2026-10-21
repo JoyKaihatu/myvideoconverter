@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video Converter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef1f4;--panel:#fff;--ink:#14202b;--mute:#5d6b79;--line:#d5dce3;--acc:#2f5bff;--acc-ink:#fff;--ok:#1b7f55;--bad:#c23b3b;--warn:#a86a00}
+@media (prefers-color-scheme:dark){:root{--bg:#0f161d;--panel:#18222c;--ink:#e8edf2;--mute:#97a5b3;--line:#2b3846;--acc:#6b8bff;--acc-ink:#0b1220;--ok:#4cc38a;--bad:#ff7b7b;--warn:#f0b24a}}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;color:var(--ink);font:16px/1.5 "Bricolage Grotesque",system-ui,sans-serif;min-height:100vh;padding:clamp(16px,4vw,56px)}
+main{max-width:760px;margin:0 auto}
+h1{font-size:clamp(40px,9vw,84px);line-height:.95;font-weight:800;letter-spacing:-.03em;margin:0 0 8px}
+h1 .to{color:var(--mute);font-weight:400}
+h1 .out{color:var(--acc)}
+.sub{color:var(--mute);margin:0 0 28px;max-width:56ch}
+.drop{display:block;border:2px dashed var(--line);border-radius:14px;background:var(--panel);padding:36px 20px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.drop:hover,.drop:focus-within,.drop.over{border-color:var(--acc)}
+.drop strong{font-size:18px}
+.drop small{display:block;color:var(--mute);margin-top:4px}
+.drop input{position:absolute;opacity:0;width:1px;height:1px}
+.opts{display:flex;flex-wrap:wrap;gap:14px;margin:20px 0}
+.opts label{display:flex;flex-direction:column;gap:4px;font-size:14px;color:var(--mute);flex:1 1 200px}
+select{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+select:focus-visible,button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+button{font:inherit;font-weight:600;border:0;border-radius:8px;padding:12px 22px;cursor:pointer;background:var(--acc);color:var(--acc-ink)}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button:disabled{opacity:.45;cursor:not-allowed}
+#status{color:var(--mute);font-size:14px}
+ul{list-style:none;margin:22px 0 0;padding:0;display:grid;gap:10px}
+li{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;gap:6px}
+.row{display:flex;justify-content:space-between;gap:12px;align-items:baseline;flex-wrap:wrap}
+.name{font-weight:600;overflow-wrap:anywhere}
+.meta{font-size:14px;color:var(--mute)}
+.tag{font-size:13px;font-weight:600;padding:2px 8px;border-radius:99px;border:1px solid var(--line)}
+.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+progress{width:100%;height:6px;accent-color:var(--acc)}
+a.dl{font-weight:600;color:var(--acc);text-decoration:none}
+a.dl:hover{text-decoration:underline}
+footer{margin-top:36px;color:var(--mute);font-size:13px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title">Any video <span class="to">to</span> <span class="out" id="outName">MP4</span></h1>
+  <p class="sub">Convert video files without uploading them. Everything runs in your browser, and your files never leave your device.</p>
+
+  <label class="drop" id="drop">
+    <input type="file" id="file" multiple accept="video/*,.webm,.mkv,.mp4,.m4v,.mov,.avi,.flv,.ogv,.ogg,.3gp,.ts,.mpg,.mpeg,.wmv,.gif">
+    <strong>Choose videos or drop them here</strong>
+    <small>WebM, MP4, MOV, MKV, AVI, FLV, OGV, 3GP, MPEG, TS, WMV, GIF</small>
+  </label>
+
+  <div class="opts">
+    <label>Convert to
+      <select id="fmt">
+        <option value="mp4">MP4 (H.264 + AAC)</option>
+        <option value="webm">WebM (VP8 + Opus)</option>
+        <option value="mkv">MKV (H.264 + AAC)</option>
+        <option value="mov">MOV (H.264 + AAC)</option>
+        <option value="avi">AVI (MPEG-4 + MP3)</option>
+        <option value="gif">Animated GIF</option>
+        <option value="mp3">MP3 (audio only)</option>
+        <option value="wav">WAV (audio only)</option>
+      </select>
+    </label>
+    <label>Quality
+      <select id="qual">
+        <option value="fast">Fast (larger file)</option>
+        <option value="balanced" selected>Balanced</option>
+        <option value="high">High (slower)</option>
+      </select>
+    </label>
+  </div>
+
+  <div class="actions">
+    <button id="go" disabled>Convert</button>
+    <button id="clear" class="ghost" disabled>Clear list</button>
+    <span id="status" role="status"></span>
+  </div>
+
+  <ul id="list"></ul>
+  <footer>Powered by ffmpeg.wasm. Large files are slow because conversion runs on your CPU. Files over about 2 GB will not fit in browser memory.</footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const MAX_BYTES = 2 * 1024 * 1024 * 1024;
+
+/* ---------- File detection: reads the first bytes, not the extension ---------- */
+async function detect(file) {
+  const b = new Uint8Array(await file.slice(0, 4096).arrayBuffer());
+  const s = (a, z) => String.fromCharCode(...b.subarray(a, z));
+  const at = (...v) => v.every((x, i) => b[i] === x);
+  if (b.length < 12) return null;
+  if (at(0x1A, 0x45, 0xDF, 0xA3)) return s(0, 64).includes("webm") ? { fam: "webm", label: "WebM" } : { fam: "mkv", label: "Matroska (MKV)" };
+  if (s(4, 8) === "ftyp") {
+    const brand = s(8, 12);
+    if (brand === "qt  ") return { fam: "mov", label: "QuickTime (MOV)" };
+    if (brand.startsWith("3g")) return { fam: "3gp", label: "3GP" };
+    if (brand === "M4A ") return null; // audio-only, not a video
+    return { fam: "mp4", label: brand.startsWith("M4V") ? "M4V" : "MP4" };
+  }
+  if (s(0, 4) === "RIFF" && s(8, 12) === "AVI ") return { fam: "avi", label: "AVI" };
+  if (s(0, 3) === "FLV") return { fam: "flv", label: "Flash Video (FLV)" };
+  if (s(0, 4) === "OggS") return { fam: "ogg", label: "Ogg Video" };
+  if (at(0x30, 0x26, 0xB2, 0x75)) return { fam: "wmv", label: "Windows Media (WMV)" };
+  if (s(0, 4) === "GIF8") return { fam: "gif", label: "GIF" };
+  if (at(0x00, 0x00, 0x01, 0xBA) || at(0x00, 0x00, 0x01, 0xB3)) return { fam: "mpg", label: "MPEG" };
+  if (b[0] === 0x47 && b[188] === 0x47 && b[376] === 0x47) return { fam: "ts", label: "MPEG-TS" };
+  return null;
+}
+const EXT_FAMILY = { webm:"webm", mkv:"mkv", mp4:"mp4", m4v:"mp4", mov:"mov", avi:"avi", flv:"flv", ogv:"ogg", ogg:"ogg", "3gp":"3gp", ts:"ts", mpg:"mpg", mpeg:"mpg", wmv:"wmv", gif:"gif" };
+
+/* ---------- Output presets ---------- */
+const CRF = { fast: 28, balanced: 23, high: 19 };
+const PRESET = { fast: "ultrafast", balanced: "veryfast", high: "medium" };
+const EVEN = "scale=trunc(iw/2)*2:trunc(ih/2)*2";
+function args(fmt, q) {
+  const h264 = ["-vf", EVEN, "-c:v", "libx264", "-preset", PRESET[q], "-crf", String(CRF[q]), "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k"];
+  switch (fmt) {
+    case "mp4": case "mov": return [...h264, "-movflags", "+faststart"];
+    case "mkv": return h264;
+    case "webm": return ["-vf", EVEN, "-c:v", "libvpx", "-deadline", "realtime", "-cpu-used", q === "high" ? "2" : "5", "-crf", String(CRF[q] - 8), "-b:v", "2M", "-c:a", "libopus", "-b:a", "128k"];
+    case "avi": return ["-vf", EVEN, "-c:v", "mpeg4", "-q:v", q === "high" ? "3" : q === "fast" ? "8" : "5", "-c:a", "libmp3lame", "-q:a", "4"];
+    case "gif": return ["-an", "-vf", "fps=12,scale='min(480,iw)':-1:flags=lanczos", "-loop", "0"];
+    case "mp3": return ["-vn", "-c:a", "libmp3lame", "-q:a", q === "high" ? "0" : q === "fast" ? "5" : "2"];
+    case "wav": return ["-vn", "-c:a", "pcm_s16le"];
+  }
+}
+
+/* ---------- State and UI ---------- */
+const items = []; // {file, info, state, el}
+let ffmpeg = null, busy = false, current = null;
+const fmtSel = $("fmt");
+const fmtName = () => fmtSel.options[fmtSel.selectedIndex].text.split(" ")[0].replace("Animated", "GIF");
+const sizeStr = n => n > 1e9 ? (n / 1e9).toFixed(2) + " GB" : (n / 1e6).toFixed(1) + " MB";
+const esc = t => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function setTitle() {
+  $("outName").textContent = fmtName();
+  const first = items.find(i => i.info);
+  $("title").innerHTML = (first ? esc(first.info.label.split(" ")[0]) : "Any video") + ' <span class="to">to</span> <span class="out" id="outName">' + esc(fmtName()) + "</span>";
+}
+function refresh() {
+  const ready = items.some(i => i.state === "ready");
+  $("go").disabled = busy || !ready;
+  $("clear").disabled = busy || !items.length;
+  setTitle();
+}
+function render(it) {
+  const tag = it.state === "rejected" ? '<span class="tag bad">Not supported</span>' :
+    it.state === "done" ? '<span class="tag ok">Done</span>' :
+    it.state === "error" ? '<span class="tag bad">Failed</span>' :
+    it.state === "working" ? '<span class="tag">Converting</span>' :
+    '<span class="tag ok">' + esc(it.info.label) + "</span>";
+  let body = "";
+  if (it.note) body += '<div class="meta ' + (it.state === "rejected" || it.state === "error" ? "bad" : "warn") + '">' + esc(it.note) + "</div>";
+  if (it.state === "working") body += '<progress max="100" value="' + it.pct + '"></progress>';
+  if (it.state === "done") body += '<a class="dl" href="' + it.url + '" download="' + esc(it.outName) + '">Download ' + esc(it.outName) + " (" + sizeStr(it.outSize) + ")</a>";
+  it.el.innerHTML = '<div class="row"><span class="name">' + esc(it.file.name) + "</span>" + tag + '</div><div class="meta">' + sizeStr(it.file.size) + "</div>" + body;
+}
+
+async function addFiles(fileList) {
+  for (const file of fileList) {
+    const it = { file, el: document.createElement("li"), pct: 0 };
+    items.push(it); $("list").appendChild(it.el);
+    const ext = (file.name.split(".").pop() || "").toLowerCase();
+    try {
+      it.info = await detect(file);
+    } catch { it.info = null; }
+    if (!it.info) { it.state = "rejected"; it.note = "This is not a recognised video file. Its contents do not match any supported format, so it was skipped."; }
+    else if (file.size > MAX_BYTES) { it.state = "rejected"; it.note = "File is larger than 2 GB, which is more than the browser can process."; }
+    else if (file.size === 0) { it.state = "rejected"; it.note = "File is empty."; }
+    else {
+      it.state = "ready";
+      if (EXT_FAMILY[ext] && EXT_FAMILY[ext] !== it.info.fam) it.note = "The extension says ." + ext + " but the contents are " + it.info.label + ". Converting based on the contents.";
+      else if (!EXT_FAMILY[ext]) it.note = "Unusual file extension. Detected as " + it.info.label + ".";
+    }
+    render(it);
+  }
+  refresh();
+}
+
+/* ---------- ffmpeg ---------- */
+async function loadFFmpeg() {
+  if (ffmpeg) return ffmpeg;
+  $("status").textContent = "Loading converter (about 30 MB, cached after the first time)...";
+  const { FFmpeg } = FFmpegWASM, { toBlobURL } = FFmpegUtil;
+  const core = "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd";
+  const lib = "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd";
+  const f = new FFmpeg();
+  f.on("progress", ({ progress }) => {
+    if (!current) return;
+    current.pct = Math.max(0, Math.min(100, Math.round(progress * 100)));
+    const p = current.el.querySelector("progress"); if (p) p.value = current.pct;
+  });
+  let lastLog = "";
+  f.on("log", ({ message }) => { lastLog = message; f.lastLog = message; });
+  await f.load({
+    classWorkerURL: await toBlobURL(lib + "/814.ffmpeg.js", "text/javascript"),
+    coreURL: await toBlobURL(core + "/ffmpeg-core.js", "text/javascript"),
+    wasmURL: await toBlobURL(core + "/ffmpeg-core.wasm", "application/wasm")
+  });
+  return (ffmpeg = f);
+}
+
+async function convertAll() {
+  busy = true; refresh();
+  const fmt = fmtSel.value, q = $("qual").value;
+  try { await loadFFmpeg(); }
+  catch (e) {
+    $("status").textContent = "Could not load the converter. Check your connection and try again.";
+    busy = false; refresh(); return;
+  }
+  const queue = items.filter(i => i.state === "ready");
+  let n = 0;
+  for (const it of queue) {
+    n++; current = it; it.state = "working"; it.pct = 0; it.note = ""; render(it);
+    $("status").textContent = "Converting " + n + " of " + queue.length + "...";
+    const inName = "input." + it.info.fam, outFile = "output." + fmt;
+    try {
+      await ffmpeg.writeFile(inName, new Uint8Array(await it.file.arrayBuffer()));
+      const code = await ffmpeg.exec(["-i", inName, ...args(fmt, q), "-y", outFile]);
+      if (code !== 0) throw new Error("FFmpeg exited with code " + code + ". " + (ffmpeg.lastLog || ""));
+      const data = await ffmpeg.readFile(outFile);
+      const mime = { mp4:"video/mp4", webm:"video/webm", mkv:"video/x-matroska", mov:"video/quicktime", avi:"video/x-msvideo", gif:"image/gif", mp3:"audio/mpeg", wav:"audio/wav" }[fmt];
+      const blob = new Blob([data.buffer], { type: mime });
+      if (it.url) URL.revokeObjectURL(it.url);
+      it.url = URL.createObjectURL(blob);
+      it.outSize = blob.size;
+      it.outName = it.file.name.replace(/\.[^.]+$/, "") + "." + fmt;
+      it.state = "done";
+    } catch (e) {
+      it.state = "error";
+      it.note = "Conversion failed. " + (e.message || "Unknown error") + (/memory|alloc/i.test(e.message || "") ? " The file may be too large for browser memory." : "");
+    } finally {
+      try { await ffmpeg.deleteFile(inName); } catch {}
+      try { await ffmpeg.deleteFile(outFile); } catch {}
+    }
+    render(it);
+  }
+  current = null; busy = false;
+  $("status").textContent = "Finished.";
+  refresh();
+}
+
+/* ---------- Events ---------- */
+$("file").addEventListener("change", e => { addFiles([...e.target.files]); e.target.value = ""; });
+const drop = $("drop");
+["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => addFiles([...e.dataTransfer.files]));
+fmtSel.addEventListener("change", () => { items.forEach(i => { if (i.state === "done") { i.state = "ready"; i.note = ""; render(i); } }); refresh(); });
+$("go").addEventListener("click", convertAll);
+$("clear").addEventListener("click", () => { items.forEach(i => i.url && URL.revokeObjectURL(i.url)); items.length = 0; $("list").innerHTML = ""; $("status").textContent = ""; refresh(); });
+refresh();
+</script>
+</body>
+</html>
